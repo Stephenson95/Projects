@@ -18,7 +18,6 @@ for(col in cat_fields){#Convert categorical variables to factors
   } else{
     train_data[,col] <- as.factor(train_data[,col])
   }
-  
 }
 
 analyse_df <- train_data[fields_to_analyse]
@@ -36,8 +35,12 @@ cor_matrix<-cor(na.omit(analyse_df[num_fields]))
 cor_matrix
 corrplot(cor_matrix, type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
 
-#Distributions
-
+#Distributions of continuous variables
+par(mfrow = c(2,4))
+for(field in num_fields[-c(5)]){
+  hist(analyse_df[,field], main = paste('Histogram of', field))
+}
+par(mfrow = c(1,1))
 
 #Co-variate Plot
 
