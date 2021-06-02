@@ -1,8 +1,12 @@
 #Libraries
 library(tidyverse)
 library(corrplot)
-#install.packages('Amelia')
+#install.packages('gbm')
+library(tree)
+library(randomForest)
+library(gbm)
 library(Amelia)
+library(glmnet)
 library(gridExtra)
 options(warn=-1)
 #library(sets)
@@ -64,25 +68,18 @@ investigation_water <- analyse_df %>%
 
 #Not drastically different, most likely missing at random. Imputation is an appropriate further approach.
 
-#p2 <-investigation_water %>% 
-#  ggplot(aes(y=reorder(Station, prop_missing_water), x=prop_missing_water)) + 
-#  geom_bar(stat="identity") +
-#  ylab('Station')
-
-#grid.arrange(p1,p2, ncol = 2)
-
-rm(p1,p2,investigation_conduc, investigation_water)
+rm(investigation_conduc, investigation_water)
 
 #Extract Stations with more than 90% missing
-missing_stations_conduc <- investigation_conduc[investigation_conduc$prop_missing_cond >0.9, 'Station']
-missing_stations_water <- investigation_water[investigation_water$prop_missing_water >0.9, 'Station']
+#missing_stations_conduc <- investigation_conduc[investigation_conduc$prop_missing_cond >0.9, 'Station']
+#missing_stations_water <- investigation_water[investigation_water$prop_missing_water >0.9, 'Station']
 
-nrow(setdiff(missing_stations_conduc, missing_stations_water))
+#nrow(setdiff(missing_stations_conduc, missing_stations_water))
 
-nrow(intersect(missing_stations_conduc, missing_stations_water))/nrow(missing_stations_conduc)
-nrow(intersect(missing_stations_conduc, missing_stations_water))/nrow(missing_stations_water)
+#nrow(intersect(missing_stations_conduc, missing_stations_water))/nrow(missing_stations_conduc)
+#nrow(intersect(missing_stations_conduc, missing_stations_water))/nrow(missing_stations_water)
 
-rm(missing_stations_conduc, missing_stations_water)
+#rm(missing_stations_conduc, missing_stations_water)
 
 #Looking at the correlation of numeric data 
 cor_matrix<-cor(na.omit(analyse_df[num_fields]))
@@ -193,10 +190,9 @@ set.seed(1)
 imputed_train_data <- amelia(train_data, m = 3, ts = 'Day',ords = c('Station','Stream.Water.Level'), id_vars = c('Case.ID'))
 imputed_test_data <- amelia(test_data, m = 3, ts = 'Day',ords = c('Station'), id_vars = c('Case.ID'))
 
+#Prepare data and Feature Engineering
 mod_data <- train_data
-testing_data <- test_data
 
-#Feature Engineering
 mod_data$Elev_bin <- ifelse(mod_data$Elev > 0, 'Elev > 0', 'Elev = 0')
 mod_data$Elev_bin <- factor(mod_data$Elev_bin, levels = c('Elev = 0','Elev > 0'))
 mod_data <- mod_data[-c(5)]
@@ -221,7 +217,13 @@ testing_data <- testing_data[, -c(2,3)]
 #Linear Regression Naive Model(Backward selection based on p-values)
 min_stream_discharge_value <- min(analyse_df[analyse_df[,'Stream.Discharge']!=0 & !is.na(analyse_df[,'Stream.Discharge']),'Stream.Discharge'])
 naive_mod_1 <- lm(log(Stream.Discharge + min_stream_discharge_value)~., data=mod_data[-c(2,9)])
-summary(naive_mod_1)
+naive_mod_1
+naive_mod_1$coefficients
+test$coefficients['Day',2] <-  1.3
+
+predict(test, newdata = test_data)
+
+naive_mod_1$model <- c(1,2)
 
 naive_mod_2 <- lm(log(Stream.Discharge + min_stream_discharge_value)~1, data=mod_data[-c(2,9)])
 summary(naive_mod_2)
@@ -231,7 +233,7 @@ summary(naive_mod_2)
 set.seed(100)
 K <- 10
 size <- nrow(train_data)/K #Getting size based on 10 folds
-overall_mse_df <- as.data.frame(matrix(0, ncol = 9, nrow = 3)) #Create df for out
+overall_mse_df <- as.data.frame(matrix(0, ncol = 6, nrow = 3)) #Create df for out (only using 7 predictors)
 names(overall_mse_df) <- seq(1:9)
 
 # 1 covariate model =================================
@@ -412,6 +414,7 @@ mse_df[,'Elev'] <- result
 overall_mse_df[,1] <-mse_df[,'Rainfall']
 
 
+
 # 2 covariate model =================================
 mse_df <- as.data.frame(matrix(0, ncol = 7, nrow = 3)) #Create df for out
 names(mse_df) <- fields_to_analyse[-c(2,3,8,9)]
@@ -574,6 +577,7 @@ mse_df[,'Elev'] <- result
 overall_mse_df[,2] <-mse_df[,'Station']
 
 
+
 # 3 covariate model =================================
 mse_df <- as.data.frame(matrix(0, ncol = 6, nrow = 3)) #Create df for out
 names(mse_df) <- fields_to_analyse[-c(1,2,3,8,9)]
@@ -721,6 +725,7 @@ overall_mse_df[,3] <-mse_df[,'Drainage']
 
 
 
+
 # 4 covariate model =================================
 mse_df <- as.data.frame(matrix(0, ncol = 5, nrow = 3)) #Create df for out
 names(mse_df) <- fields_to_analyse[-c(1,2,3,5,8,9)]
@@ -850,7 +855,6 @@ overall_mse_df[,4] <-mse_df[,'Elev']
 
 
 
-
 # 5 covariate model =================================
 mse_df <- as.data.frame(matrix(0, ncol = 4, nrow = 3)) #Create df for out
 names(mse_df) <- fields_to_analyse[-c(1,2,3,4,5,8,9)]
@@ -956,6 +960,7 @@ mse_df[,'Water.Temperature'] <- result
 overall_mse_df[,5] <-mse_df[,'Stream.Water.Level']
 
 
+
 # 6 covariate model =================================
 mse_df <- as.data.frame(matrix(0, ncol = 3, nrow = 3)) #Create df for out
 names(mse_df) <- fields_to_analyse[-c(1,2,3,4,5,8,9,10)]
@@ -971,8 +976,9 @@ for(k in 1:K){
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Stream.Discharge),]
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Rainfall),]
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Drainage),]
+  cv_test_data <- cv_test_data[!is.na(cv_test_data$Stream.Water.Level),]
   #Fit model and predict on test data
-  mod.train <- lm(log(Stream.Discharge + min_stream_discharge_value)~log(Rainfall + min(Rainfall)) + Station + log(Drainage) + Elev_bin + Stream.Water.Level + Day, data=cv_train_data)
+  mod.train <- lm(log(Stream.Discharge + min_stream_discharge_value)~log(Rainfall + min_rainfall_value) + Station + log(Drainage) + Elev_bin + Stream.Water.Level + Day, data=cv_train_data)
   mod.train$xlevels[['Station']] <- union(mod.train$xlevels[['Station']], levels(cv_test_data$Station)) #Relevel Station based on testing data
   pred.test <- sapply(exp(predict(mod.train, newdata = cv_test_data)) - min_stream_discharge_value, function(x) max(0,x))
   #Calculate mse
@@ -995,9 +1001,9 @@ for(k in 1:K){
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Stream.Discharge),]
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Rainfall),]
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Drainage),]
-  cv_test_data <- cv_test_data[!is.na(cv_test_data$Conductivity),]
+  cv_test_data <- cv_test_data[!is.na(cv_test_data$Stream.Water.Level),]
   #Fit model and predict on test data
-  mod.train <- lm(log(Stream.Discharge + min_stream_discharge_value)~log(Rainfall + min(Rainfall)) + Station + log(Drainage) + Elev + Stream.Water.Level + log(Conductivity-min_Conductivity_value+0.1), data=cv_train_data)
+  mod.train <- lm(log(Stream.Discharge + min_stream_discharge_value)~log(Rainfall + min_rainfall_value) + Station + log(Drainage) + Elev_bin + Stream.Water.Level + log(Conductivity-min_Conductivity_value+0.1), data=cv_train_data)
   mod.train$xlevels[['Station']] <- union(mod.train$xlevels[['Station']], levels(cv_test_data$Station)) #Relevel Station based on testing data
   pred.test <- sapply(exp(predict(mod.train, newdata = cv_test_data)) - min_stream_discharge_value, function(x) max(0,x))
   #Calculate mse
@@ -1019,10 +1025,10 @@ for(k in 1:K){
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Stream.Discharge),]
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Rainfall),]
   cv_test_data <- cv_test_data[!is.na(cv_test_data$Drainage),]
-  cv_test_data <- cv_test_data[!is.na(cv_test_data$Water.Temperature),]
+  cv_test_data <- cv_test_data[!is.na(cv_test_data$Stream.Water.Level),]
   #Fit model and predict on test data
-  mod.train <- lm(log(Stream.Discharge + min_stream_discharge_value)~log(Rainfall + min(Rainfall)) + Station + log(Drainage) + Elev + Stream.Water.Level + Water.Temperature, data=cv_train_data)
-  mod.train$xlevels[['Station']] <- union(mod.train$xlevels[['Station']], levels(cv_test_data$Station)) #Relevel Station based on testing data  
+  mod.train <- lm(log(Stream.Discharge + min_stream_discharge_value)~log(Rainfall + min_rainfall_value) + Station + log(Drainage) + Elev_bin + Stream.Water.Level + Water.Temperature, data=cv_train_data)
+  mod.train$xlevels[['Station']] <- union(mod.train$xlevels[['Station']], levels(cv_test_data$Station)) #Relevel Station based on testing data
   pred.test <- sapply(exp(predict(mod.train, newdata = cv_test_data)) - min_stream_discharge_value, function(x) max(0,x))
   #Calculate mse
   mse[k] <- sum((cv_test_data$Stream.Discharge - pred.test)^2)/nrow(cv_test_data)
@@ -1033,5 +1039,158 @@ result <- c(mean(mse),
             mean(mse) + stderr_cv)
 mse_df[,'Water.Temperature'] <- result
 
-#Model moving forward log(Stream.Discharge) ~ log(Rainfall + min(Rainfall)) + Station + log(Drainage) + Elev + Stream.Water.Level
-overall_mse_df[,5] <-mse_df[,'Stream.Water.Level']
+#Model moving forward log(Stream.Discharge) ~ log(Rainfall + min(Rainfall)) + Station + log(Drainage) + Elev + Stream.Water.Level + Day
+overall_mse_df[,6] <-mse_df[,'Day']
+
+
+#Plot MSE estimates
+plot(1:6, overall_mse_df[1,], 
+     type='o', lwd=3, col='red',
+     ylab='MSE',
+     main = 'No. of predictors vs MSE')
+#     ylim = c(0.12,0.3))
+lines(1:6, overall_mse_df[2,], 
+      type='l', lty=2, col='red')
+lines(1:6, overall_mse_df[3,], 
+      type='l', lty=2, col='red')
+legend('topleft', legend=c("Estimated CV(10)", "SE Intervals"),
+       col=c("red", "red"), lty=c(1,2))
+
+#We choose p=4; log(Stream.Discharge) ~ log(Rainfall + min(Rainfall)) + Station + log(Drainage) + Elev 
+#as our final model
+final_mod_lr <- lm(log(Rainfall + min(Rainfall)) + Station + log(Drainage) + Elev, data = mod_data)
+
+#Ridge Regression ====================
+
+#Split training dataset into training and validation datasets
+set.seed(1)
+index <- sample(1:nrow(mod_data), 0.8*nrow(mod_data), replace =FALSE)
+train_mod_data <- mod_data[index,]
+val_mod_data <- mod_data[-index,]
+
+#Remove NA approach and split into matrices
+X <- model.matrix(Stream.Discharge~., na.omit(train_mod_data))
+y <- na.omit(train_mod_data)[,"Stream.Discharge"]
+X.val <- model.matrix(Stream.Discharge~., val_mod_data)
+y.val <- na.omit(val_mod_data)[,"Stream.Discharge"]
+
+#Testing initial model
+test.ridge <- glmnet(X,y,alpha=0, standardise = FALSE)
+
+plot(test.ridge, label=TRUE, xvar='lambda') #Clearly some coefficients are reduced close to zero more suddenly than others
+
+#Using Cross Validation to extract best lambda
+cv.ridge <- cv.glmnet(X, y, alpha = 0, standardise = FALSE)
+
+plot(cv.ridge)
+
+best.lam <- cv.ridge$lambda.min
+
+#Perform predictions
+pred.ridge <- predict(cv.ridge, s=best.lam, newx = X.val)
+
+mse <- mean((pred.ridge - y.val)^2)
+
+mse
+
+#Fit final best model on training and validation data
+X <- model.matrix(Stream.Discharge~., na.omit(mod_data))
+y <- na.omit(mod_data)[,"Stream.Discharge"]
+
+final_mod_ridge <- glmnet(X,y,alpha=0, lambda = best.lam, standardise = FALSE)
+
+beta.hat.ridge <- predict(final_mod_ridge, s=best.lam, type='coefficients')[1:ncol(X),]
+
+sort(beta.hat.ridge, decreasing = TRUE) #Look at uncertainty?
+
+#bool <- unlist(lapply(train_mod_data, is.factor))  
+#for(factor in names(train_mod_data)[bool]){
+#  mod.train$xlevels[[factor]] <- union(mod.train$xlevels[[factor]], levels(val_mod_data[,factor])) #Relevel
+#}
+
+
+
+#Lasso Regression ====================
+
+#Testing initial model
+test.lasso <- glmnet(X,y,alpha=1, standardise = FALSE)
+
+plot(test.ridge, label=TRUE, xvar='lambda') #Clearly some coefficients are reduced close to zero more suddenly than others
+
+#Using Cross Validation to extract best lambda
+cv.lasso <- cv.glmnet(X, y, alpha = 1, standardise = FALSE)
+
+plot(cv.lasso)
+
+best.lam <- cv.lasso$lambda.min
+
+#Perform predictions
+pred.ridge <- predict(cv.lasso, s=best.lam, newx = X.val)
+
+mse <- mean((pred.ridge - y.val)^2)
+
+mse
+
+#Fit final best model on training and validation data
+X <- model.matrix(Stream.Discharge~., na.omit(mod_data))
+y <- na.omit(mod_data)[,"Stream.Discharge"]
+
+final_mod_lasso <- glmnet(X,y,alpha=1, lambda = best.lam, standardise = FALSE)
+
+beta.hat.lasso <- predict(final_mod_lasso, s=best.lam, type='coefficients')[1:ncol(X),]
+
+beta.hat.lasso[beta.hat.lasso != 0] #Look at uncertainty?
+
+#
+
+#Tree based methods: Regression ==========
+
+#Tree methods in R have a limitation of 32 levels for factor predictors
+#To overcome this issue, an attempt to cluster the Station factor has been performed by
+#using the co-ordinate data
+
+
+#Naive Model
+tree.naive <- tree(Stream.Discharge~., data = train_mod_data[,-c(1)])
+
+plot(tree.naive)
+text(tree.naive, pretty=0)
+
+pred.test <- predict(tree.naive, newdata=val_mod_data[,-c(1)])
+mse <- mean((pred.test - y.val)^2)
+mse
+
+#Random Forest Approach
+set.seed(1)
+
+#Remove NA approach
+X.val <- na.omit(val_mod_data[,-c(match('Stream.Discharge', names(val_mod_data)))])
+y.val <- na.omit(val_mod_data)[,"Stream.Discharge"]
+
+rf_mod <- randomForest(Stream.Discharge~., data = na.omit(train_mod_data), 
+                       mtry=round(length(train_mod_data)/3),
+                       ntree = 20,
+                       importance = TRUE) 
+
+pred.test <- predict(rf_mod, newdata = X.val)
+mse <- mean((pred.test - y.val)^2)
+
+#Gradient Boosted Approach
+set.seed(1)
+
+#Remove NA approach
+X.val <- na.omit(val_mod_data[,-c(match('Stream.Discharge', names(val_mod_data)))])
+y.val <- na.omit(val_mod_data)[,"Stream.Discharge"]
+
+gbm_mod <- gbm(Stream.Discharge~., data = na.omit(train_mod_data),
+               distribution = "gaussian",
+               shrinkage=0.01,
+               interaction.depth = 2,
+               n.trees = 5000) 
+
+pred.test <- predict(gbm_mod, newdata = X.val)
+
+mse <- mean((pred.test - y.val)^2)
+
+mse
+
