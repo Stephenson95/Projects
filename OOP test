@@ -1,0 +1,54 @@
+class Employee:
+    
+    num_of_employees = 0 #Class attributes
+    MIN_INCREASE = 1000 
+    
+    def __init__(self, first, last, pay): #Regular class methods
+        self.first = first #Instance variables
+        self.last = last
+        self.pay = pay
+        Employee.num_of_employees += 1
+        
+    def increase_pay(self, pay_increment):
+        if pay_increment > self.MIN_INCREASE:
+            self.pay += pay_increment
+        else:
+            print('Not a high enough increment')
+    def display_pay(self):
+        print(self.pay)
+    
+    @classmethod #Class method
+    def set_raise_amt(cls, amount):
+        cls.MIN_INCREASE = amount
+        
+    @classmethod
+    def from_string(cls, emp_string):
+        first, last, pay = emp_string.split('-')
+        return cls(first, last, pay)
+    
+    @staticmethod
+    def is_workday(day):
+        if day.weekday() == 5 or day.weekday() == 6:
+            return False
+        else:
+            return True
+            
+    
+        
+
+test = Employee('Bob', 'Junior', 100000) #Instance of the Employee Class
+
+test.increase_pay(50)
+
+test.display_pay()
+
+#Can modify class variables
+test2 = Employee('Dick', 'Wick', 200000)
+
+test2.MIN_INCREASE = 50
+
+test2.increase_pay(51)
+
+print(test2.__dict__)
+
+Employee.num_of_employees
