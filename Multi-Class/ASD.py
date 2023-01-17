@@ -233,12 +233,13 @@ class Linear_Reg_Diagnostic():
     
 
 #Data import and cleaning
-file_path = r'C:\Users\Stephenson\Desktop\Code\ASD'
-column_headers = pd.read_excel(r'C:\Users\Stephenson\Desktop\Code\ASD\CSV.header.fieldids.xlsx', sheet_name = 'Sheet1')
+#file_path = r'C:\Users\Stephenson\Desktop\Code\ASD'
+file_path = r'C:\Users\61450\Documents\Python Scripts\ASD'
+column_headers = pd.read_excel(file_path + r'\CSV.header.fieldids.xlsx', sheet_name = 'Sheet1')
 
 data = pd.DataFrame(columns = column_headers.iloc[:,0])
 for file in glob.glob(file_path + r'\*.csv'):
-    data = pd.concat([data, pd.read_csv(file, names = column_headers.iloc[:,0], delimiter = r'\t')], axis = 0)
+    data = pd.concat([data, pd.read_csv(file, names = column_headers.iloc[:,0], delimiter = r'\t', engine = 'python')], axis = 0)
 
 #For future use
 country_list = data.drop_duplicates(subset = ['ActionGeo_CountryCode', 'ActionGeo_FullName'])[['ActionGeo_CountryCode', 'ActionGeo_FullName']].groupby('ActionGeo_CountryCode').first()
@@ -507,7 +508,6 @@ res_prob.summary()
 
 #XGBoost Model
 import xgboost as xgb
-from xgboost import XGBClassifier, DMatrix
 
 #Format and split data into train/validation and test set
 ord_xgb_data = ord_data_final.copy()
@@ -519,7 +519,7 @@ X, y = ord_xgb_data.loc[:, ['QuadClass_2', 'QuadClass_3', 'QuadClass_4', 'AvgTon
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 42)
 
 #Base model
-model = XGBClassifier(objective='multi:softmax', num_class = 4, n_estimators=10, seed=10)
+model = xgb.XGBClassifier(objective='multi:softmax', num_class = 4, n_estimators=10, seed=10)
 
 #Define Model Evaluation method
 cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
@@ -535,7 +535,7 @@ accuracy = float(np.sum(y_pred==y_test))/y_test.shape[0]
 print("accuracy: %f" % (accuracy))
 
 #Using DMatrix for performance/efficiency gains
-data_dmatrix = DMatrix(data = X, label = y)
+data_dmatrix = xgb.DMatrix(data = X, label = y)
 
 #Create the parameter dictionary: params
 params = {"objective":"multi:softmax", "max_depth":3, 'num_class':4}
@@ -567,17 +567,19 @@ print((cv_results["test-auc-mean"]).iloc[-1])
 
 # Create the parameter grid: gbm_param_grid
 gbm_param_grid = {
-    'colsample_bytree': [0.3, 0.7],
-    'n_estimators': [50],
-    'max_depth': [2, 5]
+    'min_child_weight' : [0.1, 1, 3, 5],
+    'gamma' : [1, 3, 5, 7],
+    'n_estimators': [50, 100, 150],
+    'max_depth': [2, 4, 8, 10],
+    'lambda' : [1, 10, 20]
 }
 
 # Instantiate the regressor: gbm
-model = XGBClassifier(objective='multi:softmax', num_class = 4)
+model = xgb.XGBClassifier(objective='multi:softmax', num_class = 4)
 
 # Perform grid search: grid_merror
 grid_merror = GridSearchCV(estimator=model, param_grid=gbm_param_grid,
-                        scoring='accuracy', cv=4, verbose=1)
+                        scoring='accuracy', cv=5, verbose=1)
 grid_merror.fit(X, y)
 
 # Print the best parameters and lowest RMSE
