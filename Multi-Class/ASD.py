@@ -233,8 +233,8 @@ class Linear_Reg_Diagnostic():
     
 
 #Data import and cleaning
-#file_path = r'C:\Users\Stephenson\Desktop\Code\ASD'
-file_path = r'C:\Users\61450\Documents\Python Scripts\ASD'
+file_path = r'C:\Users\Stephenson\Desktop\Code\ASD'
+#file_path = r'C:\Users\61450\Documents\Python Scripts\ASD'
 column_headers = pd.read_excel(file_path + r'\CSV.header.fieldids.xlsx', sheet_name = 'Sheet1')
 
 data = pd.DataFrame(columns = column_headers.iloc[:,0])
@@ -586,6 +586,9 @@ grid_merror.fit(X, y)
 print("Best parameters found: ", grid_merror.best_params_)
 print("Best accuracy found: ", (grid_merror.best_score_))
 
+#%%
 #Deep Learning
+import torch
 
+device = "cuda"
 
