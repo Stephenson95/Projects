@@ -379,7 +379,7 @@ lr_resid.qq_plot()
 
 #GBM
 from xgboost import XGBRegressor
-from sklearn.model_selection import cross_val_score, train_test_split, GridSearchCV
+from sklearn.model_selection import cross_val_score, train_test_split, GridSearchCV, RandomizedSearchCV
 from sklearn.model_selection import RepeatedKFold
 from sklearn.metrics import mean_absolute_error
 
@@ -433,6 +433,10 @@ xgb_grid = GridSearchCV(model,
                         n_jobs = -1,
                         verbose=3)
 
+xgb_grid = RandomizedSearchCV(estimator=model, param_distributions=parameters,
+                              n_iter = 5, scoring = 'neg_mean_absolute_error', cv=cv, verbose=3)
+
+
 xgb_grid.fit(X_train, y_train)
 
 print(xgb_grid.best_score_)
@@ -441,6 +445,11 @@ print(xgb_grid.best_params_)
 #Fit best model after CV
 best_model = XGBRegressor(**xgb_grid.best_params_)
 best_model.fit(X_test, y_test)
+
+y_pred = best_model.predict(X_test)
+
+mean_absolute_error(y_test, y_pred)
+
 
 feature_important = best_model.get_booster().get_score(importance_type='weight')
 keys = list(feature_important.keys())
@@ -569,17 +578,16 @@ print((cv_results["test-auc-mean"]).iloc[-1])
 gbm_param_grid = {
     'min_child_weight' : [0.1, 1, 3, 5],
     'gamma' : [1, 3, 5, 7],
-    'n_estimators': [50, 100, 150],
-    'max_depth': [2, 4, 8, 10],
-    'lambda' : [1, 10, 20]
+    'n_estimators': [100, 150],
+    'max_depth': [2, 4, 8, 10]
 }
 
 # Instantiate the regressor: gbm
 model = xgb.XGBClassifier(objective='multi:softmax', num_class = 4)
 
-# Perform grid search: grid_merror
-grid_merror = GridSearchCV(estimator=model, param_grid=gbm_param_grid,
-                        scoring='accuracy', cv=5, verbose=1)
+# Perform grid search: grid_merror 
+grid_merror = RandomizedSearchCV(estimator=model, param_distributions=gbm_param_grid,
+                        n_iter = 5, scoring='accuracy', cv=cv, verbose=3)
 grid_merror.fit(X, y)
 
 # Print the best parameters and lowest RMSE
