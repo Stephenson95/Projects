@@ -7,8 +7,9 @@ Created on Thu Jan 26 22:47:14 2023
 import pandas as pd
 import numpy as np
 import glob
+from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 import torch
 from torch import nn
@@ -17,8 +18,8 @@ pd.options.mode.chained_assignment = None
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 #Import
-file_path = r'C:\Users\Stephenson\Desktop\Code\ASD'
-#file_path = r'C:\Users\61450\Documents\Python Scripts\ASD'
+#file_path = r'C:\Users\Stephenson\Desktop\Code\ASD'
+file_path = r'C:\Users\61450\Documents\Python Scripts\ASD'
 column_headers = pd.read_excel(file_path + r'\CSV.header.fieldids.xlsx', sheet_name = 'Sheet1')
 
 data = pd.DataFrame(columns = column_headers.iloc[:,0])
@@ -189,12 +190,16 @@ for epoch in range(epochs):
         print(f"Epoch: {epoch} | Loss: {loss:.5f}, Acc: {acc:.2f}% | Test loss: {test_loss:.5f}, Test acc: {test_acc:.2f}%")
         
 #%%
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import PowerTransformer
 
-scaler = StandardScaler()
-scaler.fit(ord_data_final[['PCA_publicity']])
-ord_data_final['PCA_publicity'] = scaler.transform(ord_data_final[['PCA_publicity']])
+x_testing = pd.DataFrame(X_train.numpy(), columns = ['QuadClass_2', 'QuadClass_3', 'QuadClass_4', 'AvgTone', 'PCA_publicity'])
 
+scaler = MinMaxScaler(feature_range = (1,2))
+power = PowerTransformer(method='box-cox')
+pipeline = Pipeline(steps=[('s', scaler), ('p', power)])
+
+x_testing['PCA_publicity'] = pipeline.fit_transform(x_testing[['PCA_publicity']])
+x_testing['PCA_publicity'].plot(kind='hist')
 
 model_2 = ClassifierV3(input_features = 5, output_features = 4, hidden_units = 8).to(device)
 
