@@ -80,8 +80,8 @@ for n_epoch in gridsearch['epoch']:
             #Initialise model and optimiser
             train_model = ANNBasic(91, 3, n_hidden_array = [120], activationfunctions = [torch.nn.Sigmoid])
             
-            optimiser = optim.SGD(train_model.parameters(), lr=lr, momentum=0.1)
-            #optimiser = optim.Adam(train_model.parameters(), lr=lr)
+            #optimiser = optim.SGD(train_model.parameters(), lr=lr, momentum=0.1)
+            optimiser = optim.Adam(train_model.parameters(), lr=lr)
             
             #Train
             train_loss, train_accuracy = train_batch(device, n_epoch, train_model, optimiser, train_loader)
