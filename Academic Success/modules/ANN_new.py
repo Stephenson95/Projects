@@ -12,9 +12,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
-import sklearn
 from sklearn.model_selection import StratifiedKFold, train_test_split
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 
 #Reproducibility
 seed = 17
@@ -30,12 +29,8 @@ from Model import ANNBasic
 from utils import train_batch, test, compute_results
 
 #Load dataset
-if (sklearn.__version__ == '1.1.2'):
-    encoder = OneHotEncoder(sparse=False, drop='first', handle_unknown='ignore')
-else:
-    encoder = OneHotEncoder(sparse_output=False, drop='first', handle_unknown='ignore')
 scaler = StandardScaler()
-dataset = AcademicDataset(import_path, 'train', transform=scaler, encoder = encoder, return_onehotencoder=True)
+dataset = AcademicDataset(import_path, transform=scaler)
 
 train_idx, test_idx = train_test_split(np.arange(len(dataset)),
                                              test_size=0.2,
@@ -52,8 +47,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 #Define k folds and hyper-parameters
 n_folds = 5
-n_epochs = [200]
-neurons = [200, 220, 240, 260, 280, 300]
+n_epochs = [200, 300, 500]
+neurons = [200]
 learning_rates = [0.1]
 layers = [1, 2, 3]
 
@@ -112,57 +107,8 @@ for n_epoch in gridsearch['epoch']:
                     results_dict[key] = np.mean(results_dict[key])
                     
                 final_results_dict[config_label] = results_dict
-
+#%%
 output_path = import_path + r'\outputs'
-compute_results(output_path, final_results_dict, 'Training Output Old')
+compute_results(output_path, final_results_dict, 'Training Output New')
 
-#%%
-#Train Final model with Best hyper-parameters
-n_epoch = 200
-neuron = 200
-n_layer = 1
-lr = 0.1
 
-#Reload train dataset
-if (sklearn.__version__ == '1.1.2'):
-    encoder = OneHotEncoder(sparse=False, drop='first', handle_unknown='ignore')
-else:
-    encoder = OneHotEncoder(sparse_output=False, drop='first', handle_unknown='ignore')
-
-scaler = StandardScaler()
-
-dataset = AcademicDataset(import_path, 'train', transform=scaler, encoder=encoder, return_onehotencoder=True)
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-train_loader = DataLoader(dataset = dataset, batch_size=len(dataset), num_workers=0, pin_memory=True)
-
-final_model = ANNBasic(91, 3, n_hidden_array = [round(neuron/(layer+1)) for layer in range(n_layer)], activationfunctions = [torch.nn.Sigmoid for layer in range(n_layer)])
-
-optimiser = optim.Adam(final_model.parameters(), lr=lr)
-    
-train_loss, train_accuracy = train_batch(device, n_epoch, final_model, optimiser, train_loader)
-    
-print(r'Average training accuracy: {}'.format(train_accuracy))
-#%%
-#Perform inference
-import pandas as pd
-
-#Load test dataset
-test_encoder = dataset.return_encoder()
-scaler = StandardScaler()
-testset = AcademicDataset(import_path, 'test', transform=scaler, encoder=test_encoder, return_onehotencoder=False)
-test_loader = DataLoader(dataset = testset, batch_size=len(testset), num_workers=0, pin_memory=True)
-
-final_model.eval()
-
-for data in test_loader:
-    data = data.to(device)
-    final_output = final_model(data)
-    final_pred = final_output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
-
-submissionfile = pd.concat([testset.return_ids(), pd.DataFrame(final_pred.cpu().numpy())], axis = 1)
-submissionfile.rename(columns = {0:'Target'}, inplace=True)
-submissionfile['Target'] = submissionfile['Target'].map({0:'Dropout', 1:'Enrolled', 2:'Graduate'})
-
-submissionfile.to_csv(import_path + r'\outputs\submission.csv', index=False)

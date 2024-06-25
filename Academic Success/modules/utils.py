@@ -41,7 +41,10 @@ def train_batch(gpu_config, epochs, model, optimiser, dataloader):
     
         train_loss /= len(dataloader)
         loss_list.append(train_loss)
-        accuracy_list.append(100. * correct / len(dataloader))
+        if len(dataloader) == 1:
+            accuracy_list.append(100. * correct / len(data))
+        else:
+            accuracy_list.append(100. * correct / len(dataloader))
 
     return np.mean(loss_list), np.mean(accuracy_list)
 

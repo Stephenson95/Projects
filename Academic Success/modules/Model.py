@@ -27,3 +27,24 @@ class ANNBasic(nn.Module):
         y_pred = self.output(out)
         return y_pred
 
+class ANNTest(nn.Module):
+    def __init__(self, n_inputs, n_classes, neurons):
+        super(ANNTest, self).__init__()
+        self.layer1 = torch.nn.Linear(n_inputs, neurons)
+        self.layer2 = torch.nn.Linear(neurons, round(neurons/2))
+        self.layer3 = torch.nn.Linear(round(neurons/2), round(neurons/4))
+        self.output = torch.nn.Linear(round(neurons/4), n_classes)
+
+    def forward(self, x):
+        out = self.layer1(x)
+        out = torch.tanh(out)
+        
+        out = self.layer2(out)
+        out = torch.tanh(out)
+        
+        out = self.layer3(out)
+        out = torch.tanh(out)
+        
+        y_pred = self.output(out)
+        return y_pred
+
