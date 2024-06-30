@@ -8,6 +8,7 @@ Created on Wed Jun 19 23:11:25 2024
 #Import standard libraries
 import sys
 import os
+import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -26,7 +27,7 @@ import_path = r"C:\Users\{}\Documents\GitHub\Projects\Academic Success".format(o
 #Import modules
 sys.path.append(import_path + r'\modules')
 from Dataloader import AcademicDataset
-from Model import ANNBasic
+from Model import ANN2layer
 from utils import train_batch, test, compute_results
 
 #Load dataset
@@ -54,14 +55,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #Define k folds and hyper-parameters
 n_folds = 10
 n_epochs = [100, 150, 200, 250]
-neurons = [200, 220, 240, 260]
-learning_rates = [0.1]
-layers = [1]
+neurons = [180, 200, 220, 240, 260]
+learning_rates = [0.1, 0.05]
 
 gridsearch = {'epoch':n_epochs,
               'lr' : learning_rates,
-              'neuron' : neurons,
-              'layers' : layers}
+              'neuron' : neurons}
 
 #Cross Validation
 final_results_dict = {}   
@@ -69,58 +68,79 @@ final_results_dict = {}
 
 for n_epoch in gridsearch['epoch']:
     for neuron in gridsearch['neuron']:
-        for n_layer in gridsearch['layers']:
-            for lr in gridsearch['lr']:
-        
-                #Set fold
-                kf = StratifiedKFold(n_splits = n_folds, shuffle = True, random_state=seed)
+        for lr in gridsearch['lr']:
+    
+            #Set fold
+            kf = StratifiedKFold(n_splits = n_folds, shuffle = True, random_state=seed)
+            
+            #Set result outputs
+            results_dict = {'Train Loss' : [], 'Train Accuracy' : [], 'Validation Loss' : [], 'Validation Accuracy' : []}
+            
+            #Loop through each fold for the dataset
+            for fold, (train_idx, val_idx) in enumerate(kf.split(np.zeros(len(train_dataset)), [label for _, label in train_dataset])):
                 
-                #Set result outputs
-                results_dict = {'Train Loss' : [], 'Train Accuracy' : [], 'Validation Loss' : [], 'Validation Accuracy' : []}
+                #Create train and val loader
+                train_data = torch.utils.data.Subset(train_dataset, train_idx)
+                val_data= torch.utils.data.Subset(train_dataset, val_idx)
                 
-                #Loop through each fold for the dataset
-                for fold, (train_idx, val_idx) in enumerate(kf.split(np.zeros(len(train_dataset)), [label for _, label in train_dataset])):
-                    
-                    #Create train and val loader
-                    train_data = torch.utils.data.Subset(train_dataset, train_idx)
-                    val_data= torch.utils.data.Subset(train_dataset, val_idx)
-                    
-                    train_loader = DataLoader(dataset = train_data, batch_size=len(train_data), num_workers=0, pin_memory=True)
-                    val_loader = DataLoader(dataset = val_data, batch_size=len(val_data), num_workers=0, pin_memory=True)
-                    
-                    #Initialise model and optimiser
-                    train_model = ANNBasic(257, 3, n_hidden_array = [round(neuron/(layer+1)) for layer in range(n_layer)], activationfunctions = [torch.nn.Sigmoid for layer in range(n_layer)])   
+                train_loader = DataLoader(dataset = train_data, batch_size=len(train_data), num_workers=0, pin_memory=True)
+                val_loader = DataLoader(dataset = val_data, batch_size=len(val_data), num_workers=0, pin_memory=True)
+                
+                #Initialise model and optimiser
+                train_model = ANN2layer(257, 3, neuron)   
 
-                    optimiser = optim.Adam(train_model.parameters(), lr=lr)
-                    
-                    #Train
-                    train_loss, train_accuracy = train_batch(device, n_epoch, train_model, optimiser, train_loader)
-                    results_dict['Train Loss'].append(train_loss)
-                    results_dict['Train Accuracy'].append(train_accuracy)
-                    
-                    #Validation
-                    val_loss, val_accuracy = test(device, train_model, val_loader)
-                    results_dict['Validation Loss'].append(val_loss) 
-                    results_dict['Validation Accuracy'].append(val_accuracy)
-                    
-                #Append results
-                config_label = "Seed:{}-Epoch:{}-Neuron:{}-Layers:{}".format(seed, n_epoch, neuron, n_layer)
+                optimiser = optim.Adam(train_model.parameters(), lr=lr)
                 
-                #Calculate average results of all folds
-                for key in results_dict.keys():
-                    results_dict[key] = np.mean(results_dict[key])
-                    
-                final_results_dict[config_label] = results_dict
+                #Train
+                train_loss, train_accuracy = train_batch(device, n_epoch, train_model, optimiser, train_loader)
+                results_dict['Train Loss'].append(train_loss)
+                results_dict['Train Accuracy'].append(train_accuracy)
+                
+                #Validation
+                val_loss, val_accuracy = test(device, train_model, val_loader)
+                results_dict['Validation Loss'].append(val_loss) 
+                results_dict['Validation Accuracy'].append(val_accuracy)
+                
+            #Append results
+            config_label = "Seed:{}-Epoch:{}-Neuron:{}-LearningRate:{}".format(seed, n_epoch, neuron, lr)
+            
+            #Calculate average results of all folds
+            for key in results_dict.keys():
+                results_dict[key] = np.mean(results_dict[key])
+                
+            final_results_dict[config_label] = results_dict
 
 output_path = import_path + r'\outputs'
 compute_results(output_path, final_results_dict, 'Training Output')
 
 #%%
+#Test best hyper-parameters on test set
+n_epoch = 100
+neuron = 240
+lr = 0.05
+
+#Reload model, optimiser and dataloaders
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+train_loader = DataLoader(dataset = train_dataset, batch_size=len(train_data), num_workers=0, pin_memory=True)
+test_loader = DataLoader(dataset = test_dataset, batch_size=len(train_data), num_workers=0, pin_memory=True)
+
+train_model = ANN2layer(257, 3, neuron)
+
+optimiser = optim.Adam(train_model.parameters(), lr=lr)
+    
+train_loss, train_accuracy = train_batch(device, n_epoch, train_model, optimiser, train_loader)
+test_loss, test_accuracy = test(device, train_model, test_loader)
+
+print(r'Average train loss: {} Average train accuracy: {}'.format(train_loss, train_accuracy))
+
+print(r'Average test loss: {} Average test accuracy: {}'.format(test_loss, test_accuracy))
+
+#%%
 #Train Final model with Best hyper-parameters
 n_epoch = 100
-neuron = 200
-n_layer = 1
-lr = 0.1
+neuron = 240
+lr = 0.05
 
 #Reload train dataset
 if (sklearn.__version__ == '1.1.2'):
@@ -136,16 +156,13 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 train_loader = DataLoader(dataset = dataset, batch_size=len(dataset), num_workers=0, pin_memory=True)
 
-final_model = ANNBasic(257, 3, n_hidden_array = [round(neuron/(layer+1)) for layer in range(n_layer)], activationfunctions = [torch.nn.Sigmoid for layer in range(n_layer)])
+final_model = ANN2layer(257, 3, neuron)
 
 optimiser = optim.Adam(final_model.parameters(), lr=lr)
     
 train_loss, train_accuracy = train_batch(device, n_epoch, final_model, optimiser, train_loader)
     
-print(r'Average training accuracy: {}'.format(train_accuracy))
-#%%
 #Perform inference
-import pandas as pd
 
 #Load test dataset
 test_encoder = dataset.return_encoder()
@@ -164,4 +181,4 @@ submissionfile = pd.concat([testset.return_ids(), pd.DataFrame(final_pred.cpu().
 submissionfile.rename(columns = {0:'Target'}, inplace=True)
 submissionfile['Target'] = submissionfile['Target'].map({0:'Dropout', 1:'Enrolled', 2:'Graduate'})
 
-submissionfile.to_csv(import_path + r'\outputs\submission.csv', index=False)
+submissionfile.to_csv(import_path + r'\outputs\submission_ANN2lyr.csv', index=False)

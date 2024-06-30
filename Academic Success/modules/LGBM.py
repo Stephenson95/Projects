@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jun 24 23:46:58 2024
+Created on Sat Jun 29 15:52:05 2024
 
 @author: 61450
 """
@@ -13,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import classification_report, confusion_matrix
-import xgboost as xgb
+import lightgbm as lgbm
 
 #Reproducibility
 seed = 0
@@ -46,7 +46,7 @@ x_train, x_test, y_train, y_test = train_test_split(X, y,
 #%%
 #Base Model
 
-final_model = xgb.XGBClassifier()
+final_model = lgbm.LGBMClassifier(device='gpu')
 final_model.fit(x_train,y_train)
 y_pred = final_model.predict(x_test)
 
@@ -62,7 +62,7 @@ y_pred = final_model.predict(test_data)
 output = le.inverse_transform(y_pred)
 submissionfile = pd.concat([pd.Series(output_id), pd.Series(output)], axis = 1)
 submissionfile.rename(columns = {0:'Target'}, inplace=True)
-submissionfile.to_csv(import_path + r'\outputs\submission_xgb.csv', index=False)
+submissionfile.to_csv(import_path + r'\outputs\submission_lgb.csv', index=False)
  
 
 #%%
@@ -74,18 +74,18 @@ final_results_dict = {}
 
 #Define hyper-parameters
 
-param_grid={"learning_rate": [0.01, 0.05, 0.10, 0.15],
-            "max_depth": [ 3, 4, 5, 6, 7, 8],
-            "min_child_weight": [ 1, 3, 5],
-            "gamma" : [1, 2, 3]} 
+param_grid={"learning_rate": [0.01, 0.05, 0.10],
+            "max_depth": [ 1, 5, 10, 20, 30],
+            "num_leaves" : [10, 20, 40, 80, 160],
+            "feature_fraction": [0.2, 0.4, 0.8, 1]} 
 
 #Set fold
 kf = StratifiedKFold(n_splits = 5, shuffle = True, random_state=seed)
 
 for learning_rate in param_grid['learning_rate']:
     for max_depth in param_grid['max_depth']:
-        for min_child_weight in param_grid['min_child_weight']:
-            for gamma in param_grid['gamma']:
+        for num_leaves in param_grid['num_leaves']:
+            for feature_fraction in param_grid['feature_fraction']:
             
                 test_scores = []
                 best_rounds = []
@@ -95,9 +95,9 @@ for learning_rate in param_grid['learning_rate']:
                     y_train_fold, y_val_fold = y_train[train_index], y_train[val_index]
         
                     # Prepare the model
-                    model = xgb.XGBClassifier(learning_rate=learning_rate,
+                    model = lgbm.LGBMClassifier(learning_rate=learning_rate,
                                                 max_depth=max_depth,
-                                                min_child_weight = min_child_weight,
+                                                feature_fraction = feature_fraction,
                                                 random_state=seed)
         
                     # Fit model on train fold and use validation for early stopping
@@ -115,29 +115,32 @@ for learning_rate in param_grid['learning_rate']:
                 if average_score > best_score:
                     best_score = average_score
                     best_params = {'learning_rate': [learning_rate], 
-                                   'max_depth': [max_depth], 
-                                   'min_child_weight' : [min_child_weight],
-                                   'gamma' : [gamma]}
+                                   'max_depth': [max_depth],
+                                   'num_leaves': [num_leaves],
+                                   'feature_fraction' : [feature_fraction]}
 
 print(f"Best Parameters: {best_params}")
 print(f"Best CV Average Accuracy: {best_score}")
 
+np.save(import_path + r'/outputs/lgbm_tuned_params.npy', best_params) 
 #%%
 #Test on hold out set
+best_params = np.load(import_path + r'/outputs/lgbm_tuned_params.npy', allow_pickle='TRUE').item()
+
 for learning_rate in best_params['learning_rate']:
     for max_depth in best_params['max_depth']:
-        for min_child_weight in best_params['min_child_weight']:
-            for gamma in best_params['gamma']:
+        for num_leaves in best_params['num_leaves']:
+            for feature_fraction in best_params['feature_fraction']:
                     
-                final_model = xgb.XGBClassifier(
+                final_model = lgbm.LGBMClassifier(
                             learning_rate=learning_rate,
                             max_depth=max_depth,
-                            min_child_weight = min_child_weight,
+                            feature_fraction = feature_fraction,
                             random_state=seed)
                 
                 # Fit model on train fold and use validation for early stopping
                 final_model.fit(x_train, y_train)
-                
+            
    
 test_score = accuracy_score(y_test, final_model.predict(x_test))
 print(test_score)
@@ -147,13 +150,14 @@ print(test_score)
 #Retrain entire dataset on best parameters
 for learning_rate in best_params['learning_rate']:
     for max_depth in best_params['max_depth']:
-        for min_child_weight in best_params['min_child_weight']:
-            for gamma in best_params['gamma']:
+        for num_leaves in best_params['num_leaves']:
+            for feature_fraction in best_params['feature_fraction']:
                     
-                final_model = xgb.XGBClassifier(
+                final_model = lgbm.LGBMClassifier(
                             learning_rate=learning_rate,
                             max_depth=max_depth,
-                            min_child_weight = min_child_weight,
+                            num_leaves = num_leaves,
+                            feature_fraction = feature_fraction,
                             random_state=seed)
                 
                 # Fit model on train fold and use validation for early stopping
@@ -180,5 +184,4 @@ output = le.inverse_transform(final_pred)
 submissionfile = pd.concat([pd.Series(output_id), pd.Series(output)], axis = 1)
 submissionfile.rename(columns = {0:'Target'}, inplace=True)
 
-submissionfile.to_csv(import_path + r'\outputs\submission_xgb.csv', index=False)
-
+submissionfile.to_csv(import_path + r'\outputs\submission_lgbm.csv', index=False)

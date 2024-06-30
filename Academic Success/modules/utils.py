@@ -91,3 +91,12 @@ def compute_results(output_path, validation_results, label):
     output.sort_values(by = 'Validation Loss', ascending = True, inplace=True)
     output.to_csv(output_path + r'\{} Table.csv'.format(label), index=True)
 
+#For XGB
+def fit_and_score(estimator, X_train, X_test, y_train, y_test):
+    """Fit the estimator on the train set and score it on both sets"""
+    estimator.fit(X_train, y_train, eval_set=[(X_test, y_test)])
+
+    train_score = estimator.score(X_train, y_train)
+    test_score = estimator.score(X_test, y_test)
+
+    return estimator, train_score, test_score

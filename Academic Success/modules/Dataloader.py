@@ -16,11 +16,11 @@ class AcademicDataset(Dataset):
         #Load data
         train_data = pd.read_csv(import_path + r'\{}.csv'.format(file_name))
         output_id = train_data['id']
-        train_data.drop('id', axis = 'columns', inplace=True)
+        train_data.drop(['id', 'Nacionality'], axis = 'columns', inplace=True)
         
         #Remove unwanted columns
-        cols_to_drop = ["Mother's occupation", "Father's occupation", "Mother's qualification", "Father's qualification", "Nacionality"]
-        train_data.drop(cols_to_drop, axis = 'columns', inplace=True)
+        #cols_to_drop = ["Mother's occupation", "Father's occupation", "Mother's qualification", "Father's qualification", "Nacionality"]
+        #train_data.drop(cols_to_drop, axis = 'columns', inplace=True)
         
         #Split labels and data
         if file_name == 'train':
@@ -30,7 +30,7 @@ class AcademicDataset(Dataset):
             X = train_data.iloc[:,:]
         
         #Define category columns to be one-hot encoded
-        cat_cols = ['Marital status', 'Application mode', 'Course', 'Previous qualification']
+        cat_cols = ['Marital status', 'Application mode', 'Course', 'Previous qualification', "Mother's occupation", "Father's occupation", "Mother's qualification", "Father's qualification"]
         
         if return_onehotencoder:
             temp_data = encoder.fit_transform(X[cat_cols])
@@ -44,8 +44,7 @@ class AcademicDataset(Dataset):
         if file_name == 'train':
             #Encode label
             le = LabelEncoder()
-            le.fit(['Dropout', 'Enrolled', 'Graduate'])
-            y = le.transform(y)
+            y = le.fit_transform(y)
             y = torch.tensor(y, dtype = torch.float32)
             
         if transform:
@@ -78,6 +77,9 @@ class AcademicDataset(Dataset):
             return self.onehotencoder
         else:
             return None
+        
+    def return_scaler(self):
+        return self.transform
         
     def return_ids(self):
         return self.output_id
