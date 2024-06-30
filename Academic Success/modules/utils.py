@@ -26,9 +26,10 @@ def train_batch(gpu_config, epochs, model, optimiser, dataloader):
             output = model(data)
             
             #Create weights for loss function
-            weights = target.unique(return_counts=True)[1].type(torch.float32).pow_(-1).to(gpu_config)
-            weights = weights/sum(weights)
-            loss = F.cross_entropy(output, target, weight = weights)
+            #weights = target.unique(return_counts=True)[1].type(torch.float32).pow_(-1).to(gpu_config)
+            #weights = weights/sum(weights)
+            #loss = F.cross_entropy(output, target, weight = weights)
+            loss = F.cross_entropy(output, target)
             
             train_loss += loss.item()
             pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
