@@ -7,11 +7,11 @@ Created on Tue Jul  2 23:23:00 2024
 import os
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score
 from sklearn.metrics import classification_report, confusion_matrix
 import xgboost as xgb
 import joblib
@@ -24,6 +24,7 @@ seed = 0
 import_path = r"C:\Users\{}\Documents\GitHub\Projects\Insurance Cross Selling".format(os.getlogin())
 train_data = pd.read_csv(import_path + r'\data\train.csv')
 train_data.drop('id', axis = 'columns', inplace=True)
+
 
 #Split labels and data
 X = train_data.iloc[:,:-1]
@@ -72,6 +73,7 @@ def objective(trial):
 
     param = {
         "verbosity": 0,
+        "seed":seed,
         "objective": "binary:logistic",
         # defines booster, gblinear for linear functions.
         "booster": trial.suggest_categorical("booster", ["gbtree", "gblinear", "dart"]),
@@ -104,8 +106,8 @@ def objective(trial):
     bst = xgb.train(param, dtrain)
     preds = bst.predict(dvalid)
     pred_labels = np.rint(preds)
-    accuracy = accuracy_score(y_test, pred_labels)
-    return accuracy
+    score = f1_score(y_test, pred_labels, average = 'weighted')
+    return score
 
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=200, timeout=600)
@@ -128,7 +130,6 @@ kf = KFold(n_splits = 10, shuffle = True, random_state=seed)
 
 test_scores = []
 
-
 for fold, (train_index, val_index) in enumerate(kf.split(X_train)):
     X_train_fold, X_val_fold = X.iloc[train_index,:], X.iloc[val_index,:]
     y_train_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
@@ -138,20 +139,21 @@ for fold, (train_index, val_index) in enumerate(kf.split(X_train)):
     model.set_params(**trial.params)
     model.set_params(device='gpu', seed = seed)
 
-    # Fit model on train fold and use validation for early stopping
+    # Fit model on train fold
     pipe = Pipeline([("preprocessing", transformer),
                     ("model", model)])
     pipe.fit(X_train_fold,y_train_fold)
     
     # Predict on test set
     y_pred_test = pipe.predict(X_val_fold)
-    test_score = accuracy_score(y_val_fold, y_pred_test)
+    test_score = f1_score(y_val_fold, y_pred_test, average = 'weighted')
     test_scores.append(test_score)
     
-    print(r"Fold {}: Accuracy {}".format(fold, test_score))
+    print(r"Fold {}: ROC_AUC {}".format(fold, test_score))
 
 # Compute average score across all folds
 average_score = np.mean(test_scores)
+print(average_score)
 
 with open(import_path + r"\outputs\XGB_scores.txt", "w") as output:
     output.write("Scores: ")
@@ -164,6 +166,18 @@ model = xgb.XGBClassifier()
 model.set_params(**trial.params)
 model.set_params(device='gpu', seed = seed)
 
+#Initialise encoders
+scaler = StandardScaler()
+encoder = OneHotEncoder(sparse_output = False)
+
+#Categorise Columns
+cat_cols = ['Gender', 'Vehicle_Age', 'Vehicle_Damage']
+num_cols = list(set(X.columns) - set(cat_cols))
+
+#Initialise Transformer
+transformer = ColumnTransformer([('cat_cols', encoder, cat_cols),
+                                ('num_cols', scaler, num_cols)])
+
 # Fit model on train fold and use validation for early stopping
 pipe = Pipeline([("preprocessing", transformer),
                 ("model", model)])
@@ -174,7 +188,7 @@ joblib.dump(pipe, import_path + r'\outputs\XGB.pkl')
 #Submission
 
 #Load model
-final_pipeline = joblib.load(import_path + r'\outputs\XGB.pkl')
+final_pipe = joblib.load(import_path + r'\outputs\XGB.pkl')
 
 #Load test data
 test_data = pd.read_csv(import_path + r'\data\test.csv')
@@ -182,7 +196,7 @@ output_id = test_data['id']
 test_data.drop('id', axis = 'columns', inplace=True)
 
 # Use the loaded pipeline model to make predictions
-final_pred = final_pipeline.predict(test_data)
+final_pred = final_pipe.predict_proba(test_data)[:,1]
 
 #Output
 submissionfile = pd.concat([pd.Series(output_id), pd.Series(final_pred)], axis = 1)

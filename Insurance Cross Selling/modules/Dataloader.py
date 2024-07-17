@@ -6,61 +6,55 @@ Created on Wed Jun 12 22:07:14 2024
 """
 import pandas as pd
 import torch
-from sklearn.preprocessing import LabelEncoder
+from scipy.sparse import hstack
 from torch.utils.data import Dataset
 
 #Customized Dataset
-class AcademicDataset(Dataset):
-    def __init__(self, import_path, file_name, transform = None, encoder = None, return_onehotencoder = False):
+class InsuranceDataset(Dataset):
+    def __init__(self, import_path, file_name, transformer = None, encoder = None):
         
         #Load data
-        train_data = pd.read_csv(import_path + r'\{}.csv'.format(file_name))
+        train_data = pd.read_csv(import_path + f'\{file_name}.csv')
         output_id = train_data['id']
-        train_data.drop(['id', 'Nacionality'], axis = 'columns', inplace=True)
-        
-        #Remove unwanted columns
-        #cols_to_drop = ["Mother's occupation", "Father's occupation", "Mother's qualification", "Father's qualification", "Nacionality"]
-        #train_data.drop(cols_to_drop, axis = 'columns', inplace=True)
+        train_data.drop('id', axis = 'columns', inplace=True)
         
         #Split labels and data
         if file_name == 'train':
-            X = train_data.iloc[:,0:-1]
+            X = train_data.iloc[:,:-1]
             y = train_data.iloc[:,-1]
         else:
-            X = train_data.iloc[:,:]
+            X = train_data
         
-        #Define category columns to be one-hot encoded
-        cat_cols = ['Marital status', 'Application mode', 'Course', 'Previous qualification', "Mother's occupation", "Father's occupation", "Mother's qualification", "Father's qualification"]
+        #Categorise Columns
+        cat_cols = ['Gender', 'Vehicle_Age', 'Vehicle_Damage']
+        num_cols = list(set(X.columns) - set(cat_cols))
         
-        if return_onehotencoder:
-            temp_data = encoder.fit_transform(X[cat_cols])
-        else:
-            temp_data = encoder.transform(X[cat_cols])
-            
-            
-        temp_X = pd.DataFrame(temp_data, columns=encoder.get_feature_names_out(cat_cols))
-        X = pd.concat([X.drop(columns=cat_cols).reset_index(drop=True), temp_X.reset_index(drop=True)], axis = 1)
-        
+        #One hot encode
         if file_name == 'train':
-            #Encode label
-            le = LabelEncoder()
-            y = le.fit_transform(y)
-            y = torch.tensor(y, dtype = torch.float32)
+            temp_data_enc = encoder.fit_transform(X[cat_cols])
+        else:
+            temp_data_enc = encoder.transform(X[cat_cols])
             
-        if transform:
-            X = transform.fit_transform(X)
+        #Standardise
+        if file_name == 'train':
+            temp_data_std = transformer.fit_transform(X[num_cols])
+        else:
+            temp_data_std = transformer.transform(X[num_cols])
+            
+        X = hstack([temp_data_std, temp_data_enc])
+            
             
         #Convert to tensor
-        X = torch.tensor(X, dtype = torch.float32)
-            
-        self.x = X
+        X = torch.tensor(X.toarray(), dtype = torch.float32)
+
         self.file_name = file_name
+        self.x = X
         if self.file_name == 'train':
+            y = torch.tensor(y, dtype = torch.float32)
             self.y = y
         self.n_samples = len(self.x)
-        self.transform = transform
-        self.return_onehotencoder = return_onehotencoder
-        self.onehotencoder = encoder
+        self.transformer = transformer
+        self.encoder = encoder
         self.output_id = output_id
 
     def __len__(self):
@@ -73,13 +67,10 @@ class AcademicDataset(Dataset):
             return self.x[idx]
         
     def return_encoder(self):
-        if self.return_onehotencoder:
-            return self.onehotencoder
-        else:
-            return None
-        
+        return self.encoder
+
     def return_scaler(self):
-        return self.transform
+        return self.transformer
         
     def return_ids(self):
         return self.output_id
