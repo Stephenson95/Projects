@@ -49,9 +49,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #%%
 #Define k folds and hyper-parameters
 n_folds = 10
-n_epochs = [50, 100]
-neurons = [22, 40, 80]
-learning_rates = [0.1, 0.01]
+n_epochs = [25, 50]
+neurons = [22, 40]
+learning_rates = [0.1]
 
 gridsearch = {'epoch':n_epochs,
               'lr' : learning_rates,
@@ -111,22 +111,22 @@ compute_results(output_path, final_results_dict, 'Training Output')
 
 #%%
 #Train Final model with Best hyper-parameters
-n_epoch = 100
-neuron = 200
-n_layer = 1
+n_epoch = 50
+neuron = 22
 lr = 0.1
 
 #Reload train dataset
-encoder = OneHotEncoder(drop='first', handle_unknown='ignore')
-scaler = StandardScaler()
+train_loader = DataLoader(dataset = train_dataset, batch_size=32, num_workers=0, pin_memory=True)
 
-train_loader = DataLoader(dataset = dataset, batch_size=32, num_workers=0, pin_memory=True)
-
-final_model = ANN1layer(11, 2, neuron)
+final_model = ANN1layer(11, 2, neuron)                  
 optimiser = optim.Adam(final_model.parameters(), lr=lr)
-    
+
 train_loss, train_accuracy = train_batch(device, n_epoch, final_model, optimiser, train_loader)
-    
+
+#Final test
+test_loader = DataLoader(dataset = test_dataset, batch_size=len(test_dataset), num_workers=0, pin_memory=True)
+test_loss, test_accuracy = test(device, final_model, test_loader)
+
 #%%
 #Perform inference
 import pandas as pd
@@ -134,14 +134,13 @@ import pandas as pd
 #Load test dataset
 test_encoder = dataset.return_encoder()
 test_scaler = dataset.return_scaler()
-testset = InsuranceDataset(import_path, 'test', transform=test_scaler, encoder=test_encoder)
+testset = InsuranceDataset(import_path + r'\data', 'test', transformer = scaler, encoder = encoder)
 test_loader = DataLoader(dataset = testset, batch_size=len(testset), num_workers=0, pin_memory=True)
 
-final_pred = compute_probs(final_model, test_loader)
+final_pred = compute_probs(device, final_model, test_loader)
 
 submissionfile = pd.concat([testset.return_ids(), pd.DataFrame(final_pred.cpu().numpy())], axis = 1)
-submissionfile.rename(columns = {0:'Target'}, inplace=True)
-submissionfile['Target'] = submissionfile['Target'].map({0:'Dropout', 1:'Enrolled', 2:'Graduate'})
+submissionfile.rename(columns = {0:'Response'}, inplace=True)
 
 submissionfile.to_csv(import_path + r'\outputs\submission_annbatch.csv', index=False)
 

@@ -58,7 +58,7 @@ def test(gpu_config, model, dataloader):
     for data, target in dataloader:
         data, target = data.to(gpu_config), target.type(torch.LongTensor).to(gpu_config)
         output = model(data)
-
+        
         test_loss += F.cross_entropy(output, target, reduction='sum').item() # sum up batch loss
         pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).long().cpu().sum()
@@ -69,10 +69,11 @@ def test(gpu_config, model, dataloader):
         100. * correct / len(dataloader.dataset)))
     return test_loss, (100. * correct / len(dataloader.dataset)).item()
 
-def compute_probs(model, dataloader):
+
+def compute_probs(gpu_config, model, dataloader):
     model.eval()
-    for data, target in dataloader:
-        data, target = target.type(torch.LongTensor)
+    for data in dataloader:
+        data = data.to(gpu_config)
         output = model(data)
         pred = F.softmax(output, dim=1)[:,1].data
     return pred
