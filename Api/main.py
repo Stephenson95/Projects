@@ -1,13 +1,9 @@
 import requests
 import pandas as pd
 import json
-from collections import OrderedDict
 
-base_url = "https://api.domain.com.au/v1/agencies"
+#Api-key
 url = 'https://api.domain.com.au/sandbox/v1/agencies/22473/listings'
-
-#def get_suburb_info(id):
-#    url = f"{base_url}/{id}"
 
 headers = {
     'Accept' : 'application/json',
@@ -60,8 +56,7 @@ for index, prop_list in enumerate(listings):
     
     output = pd.concat([output, pd.DataFrame.from_dict(result, orient = 'index').T])
     
-#auth = HTTPBasicAuth('key_7c9e3d37e20ae193eda56385f5b2312b', '')
-#files = {'file': open('filename', 'rb')}
+
 
 def get_domain_info(url):
     response = requests.get(url, headers = headers)
@@ -73,7 +68,31 @@ def get_domain_info(url):
 
 
 
-#except (ConnectionError, Timeout, TooManyRedirects) as e:
-#    print(e)
+#%%
+#OAuth2.0
+auth = ('client_9ae3ca1968db2a5ff42df36673301b94', 'secret_1b8014271e61bf92e9d280f1146b5cf0')
 
-#print(data)
+#obtain access token
+token_url = "https://auth.domain.com.au/v1/connect/token"
+response = requests.post(token_url, auth=auth, data = {"grant_type" : "client_credentials",
+                                                       "scope":"api_listings_read"})
+#print(json.dumps(response.json(),indent=4))
+access_token = response.json()["access_token"]
+token_type = response.json()["token_type"]
+
+url = 'https://api.domain.com.au/sandbox/v1/agencies/22473/listings'
+
+headers = {
+    'Accept' : 'application/json',
+    'Authorization' : token_type + " " + access_token
+}
+
+params = {
+    'listingStatusFilter' : 'live',
+    'pageNumber' : 1,
+    'pageSize' : 10
+}
+
+response = requests.get(url, headers = headers, params = params)
+print(response.status_code)
+listings = json.loads(response.text)
