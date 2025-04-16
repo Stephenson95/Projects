@@ -5,7 +5,6 @@ Created on Wed Dec 11 11:17:21 2024
 @author: Stephenson
 """
 
-#import getpass
 import os
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 #from langchain_community.document_loaders import WebBaseLoader
@@ -13,16 +12,9 @@ from langchain_chroma import Chroma
 from langchain_nomic.embeddings import NomicEmbeddings
 from langchain_community.document_loaders import WikipediaLoader
 
-#def _set_env(key: str):
-#    if key not in os.environ:
-#        os.environ[key] = getpass.getpass(f"{key}:")
-
 #key = open(r'C:\Users\Stephenson\Desktop\Code\Keys\nomic_api.txt','r').readlines()[0]
 #os.environ['NOMIC_API_KEY'] = key  
 #os.environ['USER_AGENT'] = "test_agent"  
-
-#_set_env("NOMIC_API_KEY")
-#_set_env("USER_AGENT") #my_agent
 
 #%%
 #Create vector database
@@ -53,6 +45,7 @@ vectorstore = Chroma.from_documents(
                               inference_mode="local")
 )
 retriever = vectorstore.as_retriever()
+
 #%%
 from langchain.prompts import PromptTemplate
 from langchain_ollama import ChatOllama
