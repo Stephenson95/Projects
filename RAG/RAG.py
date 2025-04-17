@@ -6,7 +6,7 @@ Created on Wed Dec 11 11:17:21 2024
 """
 
 import os
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+#from langchain.text_splitter import RecursiveCharacterTextSplitter
 #from langchain_community.document_loaders import WebBaseLoader
 from langchain_chroma import Chroma
 from langchain_nomic.embeddings import NomicEmbeddings
