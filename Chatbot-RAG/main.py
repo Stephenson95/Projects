@@ -111,7 +111,7 @@ graph_builder.add_edge("generate", END)
 graph = graph_builder.compile()
 
 
-input_message = "What does Tsunade like to do?"
+input_message = "What elements of Japanese mythology does Naruto take inspiration from?"
 
 for step in graph.stream(
     {"messages": [{"role": "user", "content": input_message}]},
