@@ -1,14 +1,9 @@
 import os
-from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import base64
-
-#Load environment variables
-load_dotenv()
-GMAIL_TOKEN_PATH = os.getenv("GMAIL_TOKEN_PATH")
 
 # Only Read Gmail messages
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
