@@ -23,8 +23,15 @@ def serialise_message(message):
 
 send_message(message)
 
+#Send hello message and read response
 response = process.stdout.readline()
 print('[SERVER]:', response.strip())
+
+#Send list tools message and read response
+send_message(serialise_message(list_tools_message))
+response = process.stdout.readline()
+print('[SERVER]:', response.strip())
+
 
 send_message('exit')
 
