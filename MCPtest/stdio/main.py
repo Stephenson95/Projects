@@ -1,20 +1,14 @@
+from stdio.client import serialise_message, send_message
 from stdio.utils.messages import list_tools_message, initialise_request, initialise_response, initialised_message
 import subprocess
 import json
-import sys
 
-process = subprocess.Popen([sys.executable, '-m', 'stdio.server'], 
-                           stdin=subprocess.PIPE,
-                           stdout=subprocess.PIPE,
-                           text=True)
+process = subprocess.Popen(['python3', './stdio/server.py'], 
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        text=True)
 
-def send_message(message):
-    print(f'[CLIENT] Sending message to server... Message: {message.strip()}')
-    process.stdin.write(message)
-    process.stdin.flush()
 
-def serialise_message(message):
-    return json.dumps(message) + '\n'
 
 def connect():
     print('Connecting to server...')
@@ -75,3 +69,9 @@ def main():
     close_server()
 
 main()
+
+
+
+
+
+print("hello")
