@@ -1,10 +1,3 @@
-list_tools_message = {"jsonrpc" : "2.0",
-                      "id" : 1,
-                      "method" : "tools/list",
-                      "params" : {}
-                      }
-
-
 initialise_request = {"jsonrpc" : "2.0",
                       "id" : 1,
                       "method" : "initialise",
@@ -51,3 +44,16 @@ initialised_message = {"jsonrpc": "2.0",
                        "method": "notifications/initialised",
                        "params": {}
                        }
+
+list_tools_message = {"jsonrpc" : "2.0",
+                      "id" : 1,
+                      "method" : "tools/list",
+                      "params" : {}
+                      }
+
+progress_notification = {"jsonrpc": "2.0",
+                         "method": "notifications/progress",
+                            "params": {
+                                "message": "Working on it..."
+                            }
+                        }

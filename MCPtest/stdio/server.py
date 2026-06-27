@@ -1,12 +1,29 @@
 import sys
 import json
-from stdio.utils.messages import initialise_response
+from stdio.utils.messages import initialise_response, progress_notification
+from stdio.external_server import ProductStore, create_sampling_message
 
 def send_response(response):
     print(json.dumps(response))
     sys.stdout.flush()
 
+def handle_sampling_response(response):
+    content = response['result']['content']['text']
+    print("[SERVER] [Sampling response received]:", content)
+    sys.stdout.flush()
+    #TODO, update the store or perform any other action with the response
+
 initialised = False
+
+product_sample = {
+    "id": "12345",
+    "name": "Sample Product",
+    "price": 19.99,
+    "keywords": ["sample", "product", "example"]
+}
+
+store = ProductStore()
+store.add_listener("new_product", lambda product: print(json.dumps(create_sampling_message(product)) and sys.stdout.flush()))
 
 while True:
     for line in sys.stdin:
@@ -33,6 +50,7 @@ while True:
                     break
 
                 case "tools/list":
+                    #Prepare tool list response
                     response = {
                         "jsonrpc": "2.0",
                         "id": json_message["id"],
@@ -56,9 +74,15 @@ while True:
 
 
                 case "tools/call":
+                    #Send notification to say we're working on it
+                    send_response(create_sampling_message(product_sample))
+                    send_response(progress_notification)
+
+                    #Extract tool name and arguments
                     tool_name = json_message['params']['name']
                     tool_args = json_message['params']['args']
 
+                    #Prepare response for tool call
                     response = {
                         "jsonrpc": "2.0",
                         "id": json_message["id"],
