@@ -33,7 +33,7 @@ and never contact Ollama.
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ollama pull llama3.1:8b
 ```

@@ -1,0 +1,8 @@
+# Phase 1 runtime dependencies
+httpx>=0.27,<1
+pydantic>=2.10,<3
+PyYAML>=6,<7
+
+# Phase 1 test and code-quality dependencies
+pytest>=8.3,<9
+ruff>=0.9,<1
