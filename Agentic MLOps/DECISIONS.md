@@ -43,3 +43,30 @@ checkpoint where validation and promotion policy will be implemented.
 
 **Trade-off.** The draft provides breadth early, but its labels may encode model bias or
 contain subtle mistakes. It must never be used to claim measured production quality.
+
+## 2026-07-22 — Phase 2: Make provenance and coverage fail-closed invariants
+
+**Decision.** Represent each case with an immutable Pydantic `TestCase` that requires an
+explicit `source`, and represent the file with a `GoldenDataset` aggregate that validates
+50–100 cases, unique IDs, complete category and difficulty coverage, and review status.
+The aggregate rejects `status: human_verified` while any `llm_placeholder` remains.
+All JSON access goes through `load_golden_dataset`, which normalizes file and validation
+failures into one caller-facing error.
+
+**Reasoning.** Provenance is part of label quality, not optional metadata. Validating it
+at the same boundary as expected category and summary makes it impossible for later eval
+code to accidentally load synthetic labels as trusted ground truth. Aggregate checks
+belong on the dataset rather than in the future runner because duplicate IDs or missing
+coverage make a corpus invalid regardless of how it is executed. Requiring the overall
+status to remain provisional until the last placeholder is promoted supports incremental
+human review without allowing a partially reviewed file to make a stronger claim than
+its least-trusted record. The loader provides a single, testable seam for Phase 3.
+
+This checkpoint intentionally leaves all 60 records as `llm_placeholder`. It is still a
+time-boxed draft and is not portfolio-ready; a person must promote or replace every case
+after reviewing the input, label, summary, difficulty, and notes.
+
+**Trade-off.** The 50-case minimum and full-coverage rules make tiny experimental files
+invalid through the production loader. Unit tests that need smaller fixtures should test
+`TestCase` directly or deliberately construct complete aggregates; weakening production
+validation for fixture convenience would make the regression gate less trustworthy.
